@@ -1,0 +1,63 @@
+{
+  "Comment": "Workflow de Orquestração de Microsserviços (DIO Challenge)",
+  "StartAt": "Validate Input",
+  "States": {
+    "Validate Input": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:408585017203:function:sf-validate-input-function",
+      "ResultPath": "$.ValidationResult",
+      "Next": "Choice",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed"
+          ],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 2
+        }
+      ]
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ValidationResult.isValid",
+          "BooleanEquals": true,
+          "Next": "Process Data"
+        }
+      ],
+      "Default": "Fail"
+    },
+    "Process Data": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:408585017203:function:sf-process-data-function",
+      "ResultPath": "$.ProcessingResult",
+      "Next": "Notify Success (sns)",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Handle failure",
+          "ResultPath": "$.ErrorDetails"
+        }
+      ]
+    },
+    "Notify Success (sns)": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:408585017203:function:sf-notify-success-function",
+      "Comment": "Invoca a função Lambda de notificação.",
+      "End": true
+    },
+    "Handle failure": {
+      "Type": "Pass",
+      "Comment": "Etapa de compensação ou registro de erro após falha no processamento.",
+      "End": true
+    },
+    "Fail": {
+      "Type": "Fail",
+      "Cause": "Dados de entrada inválidos ou fluxo de decisão não atendido.",
+      "Error": "InputInvalidError"
+    }
+  }
+}
